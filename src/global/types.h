@@ -27,7 +27,6 @@ struct Address : Point
 struct OprPlan
 {
   int iPre, iNext, iAdr;
-  double dPre, dNext;
 
   OprPlan()
   {
@@ -41,14 +40,11 @@ struct Route
 {
   int iFirst, iLast;
   int nStops;
-  vector<int> vStops;
-  double Distance;
 
   Route()
   {
     iFirst = -1;
     iLast = -1;
-    Distance = -1;
   }
 };
 
