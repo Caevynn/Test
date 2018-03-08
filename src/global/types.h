@@ -38,7 +38,7 @@ struct OprPlan
 
 struct Route
 {
-  int iFirst, iLast;
+  int iFirst, iLast, iDepot;
   int nStops;
 
   Route()

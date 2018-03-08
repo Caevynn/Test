@@ -1,11 +1,12 @@
 #include <iostream>
 #include <cmath>
+#include <random>
 
 #include "global/types.h"
 
 using namespace std;
 
-#define NO_2OPT_ITERATIONS 10
+#define N_ADRESSES 200
 
 /*vector<double> x = {10, 50, 20, -10, 60, -50};
 vector<double> y = {50, -10, 30, 60, -20, 20};*/
@@ -17,54 +18,93 @@ InstanceData ID;
 SolutionData SD;
 
 Point Depot = Point();
+int iDepot;
 
 void LoadInstanceData(void)
 {
   Address adr = Address();
 
-  for(int i = 0; i < x.size(); ++i)
+  int i = 0;
+  for(; i < x.size(); ++i)
   {
     adr.x = x[i];
     adr.y = y[i];
     adr.code = 8000 + i;
     ID.vAdr.push_back(adr);
   }
+  adr.x = 0;
+  adr.y = 0;
+  adr.code = 8000 + i;
+  ID.vAdr.push_back(adr);
+  iDepot = i;
+}
+
+void LoadInstanceDataRandom(void)
+{
+  random_device rd;
+  mt19937 gen(rd());
+  uniform_int_distribution<> dis(1,1000);
+
+  Address adr = Address();
+
+  int i = 0;
+  for(; i < N_ADRESSES; ++i)
+  {
+    adr.x = dis(gen);
+    adr.y = dis(gen);
+    adr.code = 8000 + i;
+    ID.vAdr.push_back(adr);
+  }
+  adr.x = 0;
+  adr.y = 0;
+  adr.code = 8000 + i;
+  ID.vAdr.push_back(adr);
+  iDepot = i;
 }
 
 void InitializeSolution(InstanceData& id, SolutionData* sd)
 {
   Route rt = Route();
   OprPlan op = OprPlan();
-  int nAdr = id.vAdr.size();
-  int nStops = 0;
+  int nAdr = id.vAdr.size()/2;
 
-  for(int i = 0; i < nAdr; ++i)
+  for(int j = 0; j < 2; ++j)
   {
-    op.iAdr = i;
-    op.iPre = i-1;
-    op.iNext = i+1;
-    sd->vOprPlan.push_back(op);
-    ++nStops;
-  }
-  sd->vOprPlan[nAdr-1].iNext = -1;
+    int offset = nAdr*j;
+    int nStops = 0;
+    for(int i = 0; i < nAdr; ++i)
+    {
+      op.iAdr = i + offset;
+      op.iPre = i-1 + offset;
+      op.iNext = i+1 + offset;
+      sd->vOprPlan.push_back(op);
+      ++nStops;
+    }
+    sd->vOprPlan[nAdr-1].iNext = -1;
 
-  rt.iFirst = 0;
-  rt.iLast = nAdr-1;
-  rt.nStops = nStops;
-  sd->vRoute.push_back(rt);
+    rt.iFirst = offset;
+    rt.iLast = nAdr-1 + offset;
+    rt.nStops = nStops;
+    sd->vRoute.push_back(rt);
+  }
+
+  op.iAdr = iDepot;
+  op.iPre = -1;
+  op.iNext = -1;
+  sd->vOprPlan.push_back(op);
 }
 
-void PrintSolutionVector(vector<int> vOrder)
+void PrintSolutionVector(vector<int> vOpt)
 {
-  int nStops = vOrder.size();
+  int nStops = vOpt.size();
 
   for(int i = 0; i < nStops; ++i)
-    cout << vOrder[i] << " ";
+    cout << vOpt[i] << " ";
 
   cout << endl;
 }
 
-double CalculateDistance(Point& a, Point& b)
+double CalculateDistancePoints(Point& a, Point& b)
 {
   return sqrt(pow(a.x-b.x,2) + pow(a.y-b.y,2));
 }
@@ -74,13 +114,14 @@ double CalculateRouteDistanceVector(vector<int> vStops)
   double d = 0;
   int nStops = vStops.size()-1;
 
-  d += CalculateDistance(Depot,ID.vAdr[SD.vOprPlan[vStops[0]].iAdr]);
+  d += CalculateDistancePoints(Depot,ID.vAdr[SD.vOprPlan[vStops[0]].iAdr]);
   for(int i = 0; i < nStops; ++i)
   {
-    d += CalculateDistance(ID.vAdr[SD.vOprPlan[vStops[i]].iAdr],
-                           ID.vAdr[SD.vOprPlan[vStops[i+1]].iAdr]);
+    //cout << vStops[i] << " " << vStops[i+1] << endl;
+    d += CalculateDistancePoints(ID.vAdr[SD.vOprPlan[vStops[i]].iAdr],
+                                 ID.vAdr[SD.vOprPlan[vStops[i+1]].iAdr]);
   }
-  d += CalculateDistance(Depot,ID.vAdr[SD.vOprPlan[vStops[nStops]].iAdr]);
+  d += CalculateDistancePoints(Depot,ID.vAdr[SD.vOprPlan[vStops[nStops]].iAdr]);
 
   return d;
 }
@@ -91,98 +132,258 @@ double CalculateRouteDistance(Route& rt)
   int i = rt.iFirst;
   int next;
 
-  d += CalculateDistance(Depot,ID.vAdr[SD.vOprPlan[i].iAdr]);
+  d += CalculateDistancePoints(Depot,ID.vAdr[SD.vOprPlan[i].iAdr]);
   for(; i != rt.iLast; i = next)
   {
     next = SD.vOprPlan[i].iNext;
-    d += CalculateDistance(ID.vAdr[SD.vOprPlan[i].iAdr],
-                           ID.vAdr[SD.vOprPlan[next].iAdr]);
+    d += CalculateDistancePoints(ID.vAdr[SD.vOprPlan[i].iAdr],
+                                 ID.vAdr[SD.vOprPlan[next].iAdr]);
   }
-  d += CalculateDistance(Depot,ID.vAdr[SD.vOprPlan[i].iAdr]);
+  d += CalculateDistancePoints(Depot,ID.vAdr[SD.vOprPlan[i].iAdr]);
 
   return d;
 }
 
-void CreateVectorFromRoute(Route& rt, vector<int>* vOrder)
+void CreateVectorFromRoute(Route& rt, vector<int>* vOpt)
 {
+  vOpt->clear();
   for(int i = rt.iFirst; i != rt.iLast; i = SD.vOprPlan[i].iNext)
   {
-    vOrder->push_back(i);
+    vOpt->push_back(i);
   }
-  vOrder->push_back(rt.iLast);
+  vOpt->push_back(rt.iLast);
 }
 
-void SwapTwoOptVector(vector<int>& vOrder, vector<int>* vCopy, int i, int j)
+void SwapTwoOptVector(vector<int>& vOpt, vector<int>* vNew, int i, int j)
 {
   int k = i+j+1;
-  *vCopy = vOrder;
+  *vNew = vOpt;
 
   for(int l = i; l < k; ++l)
   {
-    (*vCopy)[l] = vOrder[k];
-    (*vCopy)[k] = vOrder[l];
+    (*vNew)[l] = vOpt[k];
+    (*vNew)[k] = vOpt[l];
     --k;
   }
 }
 
-void UpdateRouteFromVector(vector<int>& vOrder, Route& rt)
+int UpdateRouteFromVector(vector<int>& vOpt, Route& rt)
 {
-  rt.iFirst = vOrder[0];
+  rt.iFirst = vOpt[0];
   SD.vOprPlan[rt.iFirst].iPre = -1;
-  SD.vOprPlan[rt.iFirst].iNext = vOrder[1];
+  SD.vOprPlan[rt.iFirst].iNext = vOpt[1];
 
   for(int i = 1; i < rt.nStops-1; ++i)
   {
-    SD.vOprPlan[vOrder[i]].iNext = vOrder[i+1];
-    SD.vOprPlan[vOrder[i]].iPre = vOrder[i-1];
+    SD.vOprPlan[vOpt[i]].iNext = vOpt[i+1];
+    SD.vOprPlan[vOpt[i]].iPre = vOpt[i-1];
   }
 
-  rt.iLast = vOrder[rt.nStops-1];
-  SD.vOprPlan[rt.iLast].iPre = vOrder[rt.nStops-2];
+  rt.iLast = vOpt[rt.nStops-1];
+  SD.vOprPlan[rt.iLast].iPre = vOpt[rt.nStops-2];
   SD.vOprPlan[rt.iLast].iNext = -1;
+
+  return 1;
 }
 
-void OptimizeRoute(Route& rt)
+void TwoOptIntraRoute(Route& rt, int nIter)
 {
-  vector<int> vOrder, vCopy;
+  vector<int> vOpt, vNew;
 
-  CreateVectorFromRoute(rt,&vOrder);
-  double dOpt = CalculateRouteDistanceVector(vOrder);
+  double dOpt, dNew;
 
-  for(int o = 0; o < NO_2OPT_ITERATIONS; ++o)
+  int cnt, improved;
+
+  for(int o = 0; o < nIter; ++o)
   {
+    CreateVectorFromRoute(rt,&vOpt);
+    dOpt = CalculateRouteDistanceVector(vOpt);
+
+    cnt = 0;
+    improved = 0;
+
     int iter = rt.nStops - 2;
     for(int i = 0; i < rt.nStops - 1; ++i)
     {
       if(i > 1) --iter;
       for(int j = 0; j < iter; ++j)
       {
-        SwapTwoOpt(vOrder,&vCopy,i,j);
-        double dNew = CalculateRouteDistanceVector(vCopy);
+        SwapTwoOptVector(vOpt,&vNew,i,j);
+        dNew = CalculateRouteDistanceVector(vNew);
 
         if(dNew < dOpt)
         {
-          vOrder = vCopy;
+          improved = 1;
+          vOpt = vNew;
           dOpt = dNew;
         }
+
+        ++cnt;
       }
     }
-  }
-  UpdateRouteFromVector(vOrder,rt);
 
-  //PrintSolutionVector(vOrder);
+    //cout << cnt << endl;
+    if(!UpdateRouteFromVector(vOpt,rt) || !improved)
+      return;
+  }
+}
+
+void CombineRoutesTwoOpt(vector<int>& vRt1,
+                         vector<int>& vRt2,
+                         vector<int>* vNew,
+                         int i, int j)
+{
+  int k = 0;
+  int offset;
+
+  // Combine first route
+  offset = k;
+  for(; k < offset + i; ++k)
+    (*vNew)[k] = vRt1[k - offset];
+
+  offset = k;
+  for(; k < offset + vRt2.size() - j; ++k)
+    (*vNew)[k] = vRt2[j + k - offset];
+
+  // Include depot
+  (*vNew)[k++] = iDepot;
+
+  // Combine second route
+  offset = k;
+  for(;k < offset + j; ++k)
+    (*vNew)[k] = vRt2[k - offset];
+
+  offset = k;
+  for(; k < offset + vRt1.size() - i; ++k)
+    (*vNew)[k] = vRt1[i + k - offset];
+}
+
+int UpdateRoutesFromVector(vector<int>& vOpt, Route& rt1, Route& rt2)
+{
+  int nStops = 0;
+  int i = 0;
+
+  // Update first route
+  rt1.iFirst = vOpt[i];
+  SD.vOprPlan[vOpt[i]].iPre = -1;
+  SD.vOprPlan[vOpt[i]].iNext = vOpt[i+1];
+  ++nStops;
+
+  ++i;
+  for(; vOpt[i+1] != iDepot; ++i)
+  {
+    SD.vOprPlan[vOpt[i]].iPre = vOpt[i-1];
+    SD.vOprPlan[vOpt[i]].iNext = vOpt[i+1];
+    ++nStops;
+  }
+
+  rt1.iLast = vOpt[i];
+  SD.vOprPlan[vOpt[i]].iPre = vOpt[i-1];
+  SD.vOprPlan[vOpt[i]].iNext = -1;
+  ++nStops;
+
+  rt1.nStops = nStops;
+
+  // Update second route
+  i += 2;
+  if(i >= vOpt.size() - 1)
+    return 0;
+
+  nStops = 0;
+  rt2.iFirst = vOpt[i];
+  SD.vOprPlan[vOpt[i]].iPre = -1;
+  SD.vOprPlan[vOpt[i]].iNext = vOpt[i+1];
+  ++nStops;
+
+  ++i;
+  for(; i < vOpt.size() - 1; ++i)
+  {
+    SD.vOprPlan[vOpt[i]].iPre = vOpt[i-1];
+    SD.vOprPlan[vOpt[i]].iNext = vOpt[i+1];
+    ++nStops;
+  }
+
+  rt2.iLast = vOpt[i];
+  SD.vOprPlan[vOpt[i]].iPre = vOpt[i-1];
+  SD.vOprPlan[vOpt[i]].iNext = -1;
+  ++nStops;
+
+  rt2.nStops = nStops;
+
+  return 1;
+}
+
+void TwoOptInterRoute(Route& rt1, Route& rt2, int nIter)
+{
+  vector<int> vRt1, vRt2;
+  vector<int> vOpt(rt1.nStops + rt2.nStops + 1);
+  vector<int> vNew(rt1.nStops + rt2.nStops + 1);
+
+  double dOpt, dNew;
+
+  int cnt, improved;
+
+  for(int o = 0; o < nIter; ++o)
+  {
+    CreateVectorFromRoute(rt1, &vRt1);
+    CreateVectorFromRoute(rt2, &vRt2);
+
+    CombineRoutesTwoOpt(vRt1, vRt2, &vOpt, 0, 0);
+    dOpt = CalculateRouteDistanceVector(vOpt);
+
+    cnt = 0;
+    improved = 0;
+
+    for(int i = 1; i < rt1.nStops; ++i)
+    {
+      for(int j = 1; j < rt2.nStops; ++j)
+      {
+        CombineRoutesTwoOpt(vRt1, vRt2, &vNew, i, j);
+        dNew = CalculateRouteDistanceVector(vNew);
+
+        if(dNew < dOpt)
+        {
+          improved = 1;
+          vOpt = vNew;
+          dOpt = dNew;
+        }
+
+        ++cnt;
+      }
+    }
+
+    //cout << cnt << endl;
+    if(!UpdateRoutesFromVector(vOpt,rt1,rt2) || !improved)
+      return;
+  }
 }
 
 int main()
 {
-  LoadInstanceData();
+  LoadInstanceDataRandom();
   InitializeSolution(ID,&SD);
 
-  cout << "Distance of Tour: " << CalculateRouteDistance(SD.vRoute[0]) << endl;
+  cout << "Tour 1: " << CalculateRouteDistance(SD.vRoute[0]) << ", " << SD.vRoute[0].nStops << endl;
+  cout << "Tour 2: " << CalculateRouteDistance(SD.vRoute[1]) << ", " << SD.vRoute[1].nStops << endl;
 
-  OptimizeRoute(SD.vRoute[0]);
+  for(int i = 0; i < 10; ++i)
+  {
+    TwoOptIntraRoute(SD.vRoute[0],4);
+    TwoOptIntraRoute(SD.vRoute[1],4);
 
-  cout << "Distance of Tour: " << CalculateRouteDistance(SD.vRoute[0]) << endl;
+    //cout << endl << "Tour 1: " << CalculateRouteDistance(SD.vRoute[0]) << ", " << SD.vRoute[0].nStops << endl;
+    //cout << "Tour 2: " << CalculateRouteDistance(SD.vRoute[1]) << ", " << SD.vRoute[1].nStops << endl;
+
+    TwoOptInterRoute(SD.vRoute[0],SD.vRoute[1],4);
+
+    //cout << endl << "Tour 1: " << CalculateRouteDistance(SD.vRoute[0]) << ", " << SD.vRoute[0].nStops << endl;
+    //cout << "Tour 2: " << CalculateRouteDistance(SD.vRoute[1]) << ", " << SD.vRoute[1].nStops << endl;
+    cout << ".";
+  }
+
+  cout << endl;
+  cout << "Tour 1: " << CalculateRouteDistance(SD.vRoute[0]) << ", " << SD.vRoute[0].nStops << endl;
+  cout << "Tour 2: " << CalculateRouteDistance(SD.vRoute[1]) << ", " << SD.vRoute[1].nStops << endl;
 
   return 0;
 }
